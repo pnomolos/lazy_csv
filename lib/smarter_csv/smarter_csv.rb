@@ -63,8 +63,8 @@ module SmarterCSV
         end
 
         file_header_size = file_headerA.size
-      else
-        raise SmarterCSV::IncorrectOption , "ERROR [smarter_csv]: If :headers_in_file is set to false, you have to provide :user_provided_headers" if options[:user_provided_headers].nil?
+      elsif options[:user_provided_headers].nil? && options[:parse_to_arrays].nil?
+        raise SmarterCSV::IncorrectOption , "ERROR [smarter_csv]: If :headers_in_file is set to false, you have to provide :user_provided_headers or :parse_to_arrays"
       end
       if options[:user_provided_headers] && options[:user_provided_headers].class == Array && ! options[:user_provided_headers].empty?
         # use user-provided headers
@@ -136,40 +136,75 @@ module SmarterCSV
         end
         dataA.map!{|x| x.gsub(%r/options[:quote_char]/,'') }
         dataA.map!{|x| x.strip}  if options[:strip_whitespace]
-        hash = Hash.zip(headerA,dataA)  # from Facets of Ruby library
-        # make sure we delete any key/value pairs from the hash, which the user wanted to delete:
-        # Note: Ruby < 1.9 doesn't allow empty symbol literals!
-        hash.delete(nil); hash.delete('');
-        if RUBY_VERSION.to_f > 1.8
-          eval('hash.delete(:"")')
-        end
+        if options[:parse_to_arrays]
+          hash = dataA
 
-        # remove empty values using the same regexp as used by the rails blank? method
-        # which caters for double \n and \r\n characters such as "1\r\n\r\n2" whereas the original check (v =~ /^\s*$/) does not
-        hash.delete_if{|k,v| v.nil? || v !~ /[^[:space:]]/}  if options[:remove_empty_values]
+          if options[:remove_empty_values]
+            hash.pop while !hash.empty? && (hash.last.nil? || hash.last !~ /[^[:space:]]/)
+          end
+          if options[:remove_zero_values]
+            hash.pop while !hash.last.nil? && hash.last =~ /^(\d+|\d+\.\d+)$/ && hash.last.to_f == 0
+          end
 
-        hash.delete_if{|k,v| ! v.nil? && v =~ /^(\d+|\d+\.\d+)$/ && v.to_f == 0} if options[:remove_zero_values]   # values are typically Strings!
-        hash.delete_if{|k,v| v =~ options[:remove_values_matching]} if options[:remove_values_matching]
-        if options[:convert_values_to_numeric]
-          hash.each do |k,v|
-            # deal with the :only / :except options to :convert_values_to_numeric
-            next if SmarterCSV.only_or_except_limit_execution( options, :convert_values_to_numeric , k )
+          if options[:convert_values_to_numeric]
+            hash.each_with_index do |v, k|
+              # deal with the :only / :except options to :convert_values_to_numeric
+              next if SmarterCSV.only_or_except_limit_execution( options, :convert_values_to_numeric , k )
 
-            # convert if it's a numeric value:
-            case v
-            when /^[+-]?\d+\.\d+$/
-              hash[k] = v.to_f
-            when /^[+-]?\d+$/
-              hash[k] = v.to_i
+              # convert if it's a numeric value:
+              case v
+              when /^[+-]?\d+\.\d+$/
+                hash[k] = v.to_f
+              when /^[+-]?\d+$/
+                hash[k] = v.to_i
+              end
+            end
+
+            if options[:value_converters]
+              hash.each_with_index do |v, k|
+                converter = options[:value_converters][k]
+                next unless converter
+                hash[k] = converter.convert(v)
+              end
             end
           end
-        end
 
-        if options[:value_converters]
-          hash.each do |k,v|
-            converter = options[:value_converters][k]
-            next unless converter
-            hash[k] = converter.convert(v)
+        else
+          hash = Hash.zip(headerA,dataA)  # from Facets of Ruby library
+          # make sure we delete any key/value pairs from the hash, which the user wanted to delete:
+          # Note: Ruby < 1.9 doesn't allow empty symbol literals!
+          hash.delete(nil); hash.delete('');
+          if RUBY_VERSION.to_f > 1.8
+            eval('hash.delete(:"")')
+          end
+
+          # remove empty values using the same regexp as used by the rails blank? method
+          # which caters for double \n and \r\n characters such as "1\r\n\r\n2" whereas the original check (v =~ /^\s*$/) does not
+          hash.delete_if{|k,v| v.nil? || v !~ /[^[:space:]]/}  if options[:remove_empty_values]
+
+          hash.delete_if{|k,v| ! v.nil? && v =~ /^(\d+|\d+\.\d+)$/ && v.to_f == 0} if options[:remove_zero_values]   # values are typically Strings!
+          hash.delete_if{|k,v| v =~ options[:remove_values_matching]} if options[:remove_values_matching]
+          if options[:convert_values_to_numeric]
+            hash.each do |k,v|
+              # deal with the :only / :except options to :convert_values_to_numeric
+              next if SmarterCSV.only_or_except_limit_execution( options, :convert_values_to_numeric , k )
+
+              # convert if it's a numeric value:
+              case v
+              when /^[+-]?\d+\.\d+$/
+                hash[k] = v.to_f
+              when /^[+-]?\d+$/
+                hash[k] = v.to_i
+              end
+            end
+          end
+
+          if options[:value_converters]
+            hash.each do |k,v|
+              converter = options[:value_converters][k]
+              next unless converter
+              hash[k] = converter.convert(v)
+            end
           end
         end
 
