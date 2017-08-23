@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 module SmarterCSV
 
   class HeaderSizeMismatch < Exception; end
@@ -134,8 +135,8 @@ module SmarterCSV
         else
           dataA =  line.split(options[:col_sep])
         end
-        dataA.map!{|x| x.gsub(%r/options[:quote_char]/,'') }
-        dataA.map!{|x| x.strip}  if options[:strip_whitespace]
+        dataA.map! {|x| x.gsub(%r/options[:quote_char]/,'') }
+        dataA.map! {|x| x.strip}  if options[:strip_whitespace]
         if options[:parse_to_arrays]
           hash = dataA
 
@@ -209,6 +210,12 @@ module SmarterCSV
         end
 
         next if hash.empty? if options[:remove_empty_hashes]
+
+        if hash.is_a?(Array)
+          hash.each(&:freeze)
+        else
+          hash.each { |_, v| v.freeze }
+        end
 
         if use_chunks
           chunk << hash  # append temp result to chunk
