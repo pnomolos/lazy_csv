@@ -127,7 +127,7 @@ module SmarterCSV
         end
         print "\nline contains uneven number of quote chars so including content through file line %d\n" % file_line_count if options[:verbose] && multiline
 
-        line.chomp!    # will use $/ which is set to options[:col_sep]
+        line.chomp!(options[:row_sep])
 
         if (line =~ %r{#{options[:quote_char]}}) and (! options[:force_simple_split])
           dataA = begin
