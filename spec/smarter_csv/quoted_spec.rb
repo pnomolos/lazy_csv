@@ -6,7 +6,7 @@ describe 'be_able_to' do
 
   it 'loads_file_with_quoted_fields' do
     options = {}
-    data = SmarterCSV.process("#{fixture_path}/quoted.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/quoted.csv", options).to_a
     data.flatten.size.should == 4
     data[1][:model].should eq 'Venture "Extended Edition"'
     data[1][:description].should be_nil

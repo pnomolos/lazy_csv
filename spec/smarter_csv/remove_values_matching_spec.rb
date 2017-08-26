@@ -3,14 +3,14 @@ require 'spec_helper'
 fixture_path = 'spec/fixtures'
 
 describe 'be_able_to' do
-  it 'remove_values_matching' do 
+  it 'remove_values_matching' do
     options = {:remove_zero_values => true, :remove_empty_values => true, :remove_values_matching => /^\d+$/}
-    data = SmarterCSV.process("#{fixture_path}/basic.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/basic.csv", options).to_a
     data.size.should == 5
     # all the keys should be symbols
     data.each{|item| item.keys.each{|x| x.class.should be == Symbol}}
 
-    data.each do |hash| 
+    data.each do |hash|
       hash.keys.each do |key|
         [:first_name, :last_name].should include( key )
       end

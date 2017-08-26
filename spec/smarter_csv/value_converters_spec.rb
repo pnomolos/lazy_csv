@@ -18,7 +18,7 @@ end
 describe 'be_able_to' do
   it 'convert date values into Date instances' do
     options = {:value_converters => {:date => DateConverter}}
-    data = SmarterCSV.process("#{fixture_path}/with_dates.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/with_dates.csv", options).to_a
     data.flatten.size.should == 3
     data[0][:date].class.should eq Date
     data[0][:date].to_s.should eq "1998-10-30"
@@ -28,7 +28,7 @@ describe 'be_able_to' do
 
   it 'converts dollar prices into float values' do
     options = {:value_converters => {:price => CurrencyConverter}}
-    data = SmarterCSV.process("#{fixture_path}/money.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/money.csv", options).to_a
     data.flatten.size.should == 2
     data[0][:price].class.should eq Float
     data[0][:price].should eq 9.99
@@ -37,7 +37,7 @@ describe 'be_able_to' do
 
   it 'convert can use multiple value converters' do
     options = {:value_converters => {:date => DateConverter, :price => CurrencyConverter}}
-    data = SmarterCSV.process("#{fixture_path}/with_dates.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/with_dates.csv", options).to_a
     data.flatten.size.should == 3
     data[0][:date].class.should eq Date
     data[0][:date].to_s.should eq "1998-10-30"

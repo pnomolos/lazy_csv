@@ -78,11 +78,9 @@ class SmarterCSV
     if @options[:user_provided_headers] && @options[:user_provided_headers].class == Array && !@options[:user_provided_headers].empty?
       # use user-provided headers
       headerA = @options[:user_provided_headers]
-      #if defined?(file_header_size) && !file_header_size.nil?
-        if headerA.size != file_header_size
-          raise SmarterCSV::HeaderSizeMismatch, "ERROR [smarter_csv]: :user_provided_headers defines #{headerA.size} headers !=  CSV-file #{input} has #{file_header_size} headers"
-        end
-      #end
+      if file_header_size && headerA.size != file_header_size
+        raise SmarterCSV::HeaderSizeMismatch, "ERROR [smarter_csv]: :user_provided_headers defines #{headerA.size} headers != CSV-file has #{file_header_size} headers"
+      end
     else
       headerA = file_headerA
     end
@@ -134,17 +132,6 @@ class SmarterCSV
     end
 
     return enumerator
-
-    c = @io.each_line(@options[:row_sep]).lazy.map do |line|
-      read_line(line, @options, @csv_options)
-    end.reject(&:nil?)
-
-    c.instance_variable_set(:@io, @io)
-    c.instance_variable_set(:@seek_pos, @io.pos)
-
-
-
-    return c
     #
     #   next unless hash
     #
@@ -200,7 +187,7 @@ class SmarterCSV
       file_headerA = begin
         CSV.parse(header, @csv_options).flatten.collect! { |x| x.nil? ? '' : x } # to deal with nil values from CSV.parse
       rescue CSV::MalformedCSVError
-        raise $ERROR_INFO, "#{$ERROR_INFO} [SmarterCSV: csv line #{csv_line_count}]", $ERROR_INFO.backtrace
+        raise $ERROR_INFO, "#{$ERROR_INFO} [SmarterCSV: csv line #{@csv_line_count}]", $ERROR_INFO.backtrace
       end
     else
       file_headerA = header.split(@options[:col_sep])

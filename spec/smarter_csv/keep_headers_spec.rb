@@ -5,7 +5,7 @@ fixture_path = 'spec/fixtures'
 describe 'be_able_to' do
   it 'not_downcase_headers' do
     options = {:keep_original_headers => true}
-    data = SmarterCSV.process("#{fixture_path}/basic.csv", options)
+    data = SmarterCSV.process("#{fixture_path}/basic.csv", options).to_a
     data.size.should == 5
     # all the keys should be string
     data.each{|item| item.keys.each{|x| x.class.should be == String}}

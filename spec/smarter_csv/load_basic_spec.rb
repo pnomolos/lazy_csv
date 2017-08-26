@@ -3,8 +3,8 @@ require 'spec_helper'
 fixture_path = 'spec/fixtures'
 
 describe 'be_able_to' do
-  it 'loads_basic_csv_file' do 
-    data = SmarterCSV.process("#{fixture_path}/basic.csv")
+  it 'loads_basic_csv_file' do
+    data = SmarterCSV.process("#{fixture_path}/basic.csv").to_a
     data.size.should == 5
 
     # all the keys should be symbols
