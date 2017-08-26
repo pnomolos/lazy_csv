@@ -1,3 +1,3 @@
 class LazyCSV
-  VERSION = "1.1.4"
+  VERSION = '0.5.0'.freeze
 end
