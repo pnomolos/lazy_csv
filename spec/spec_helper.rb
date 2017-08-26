@@ -3,7 +3,7 @@ require 'bundler/setup'
 
 Bundler.require(:default)
 
-require 'smarter_csv'
+require 'lazy_csv'
 
 
 RSpec.configure do |config|

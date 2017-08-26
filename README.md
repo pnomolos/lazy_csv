@@ -1,18 +1,17 @@
-# SmarterCSV
+# LazyCSV
 
-[![Build Status](https://secure.travis-ci.org/tilo/smarter_csv.svg?branch=master)](http://travis-ci.org/tilo/smarter_csv) [![Gem Version](https://badge.fury.io/rb/smarter_csv.svg)](http://badge.fury.io/rb/smarter_csv)
+[![Build Status](https://secure.travis-ci.org/pnomolos/lazy_csv.svg?branch=master)](http://travis-ci.org/pnomolos/lazy_csv) [![Gem Version](https://badge.fury.io/rb/lazy_csv.svg)](http://badge.fury.io/rb/lazy_csv)
 
-`smarter_csv` is a Ruby Gem for smarter importing of CSV Files as Array(s) of Hashes, suitable for direct processing with Mongoid or ActiveRecord,
-and parallel processing with Resque or Sidekiq.
+`lazy_csv` is a Ruby Gem for lazy importing of CSV Files as Arrays or Hashes,
+suitable for direct processing with Mongoid or ActiveRecord
+and parallel processing with Resque or Sidekiq.  
 
-One `smarter_csv` user wrote:
+It was originally a fork of [Smarter CSV](https://github.com/tilo/smarter_csv) but has since
+diverged significantly.
 
-  *Best gem for CSV for us yet. [...] taking an import process from 7+ hours to about 3 minutes.
-   [...] Smarter CSV was a big part and helped clean up our code ALOT*
-
-`smarter_csv` has lots of features:
+`lazy_csv` has lots of features:
+ * returns an Enumerator::Lazy so you lazily-load the file without being constrained to a single block for processing
  * able to process large CSV-files
- * able to chunk the input from the CSV file to avoid loading the whole CSV file into memory
  * return a Hash for each line of the CSV file, so we can quickly use the results for either creating MongoDB or ActiveRecord entries, or further processing with Resque
  * able to pass a block to the `process` method, so data from the CSV file can be directly processed (e.g. Resque.enqueue )
  * allows to have a bit more flexible input format, where comments are possible, and col_sep,row_sep can be set to any character sequence, including control characters.
@@ -22,7 +21,22 @@ One `smarter_csv` user wrote:
 
 NOTE; This Gem is only for importing CSV files - writing of CSV files is not supported at this time.
 
+## Notes/Warnings
+
+At this time if you pass a filename to `process` it won't be closed at the end.  For the time being
+it's probably best to use an instance of `IO` that can be closed when you're done.
+
 ### Why?
+
+Smarter CSV met a lot of my needs but I wanted to be able to pass a lazy enumerator through my code
+as opposed to running everything through a single block - I want the control of when reads are made
+for each line, as opposed to dumbly iterating over the whole thing.  This allowed for better control
+in some cases where the CSV was divided into sections and each section could be handled independently.
+
+SmarterCSV also offered chunked processing (so you could process x rows at once).  I'm hoping to have
+that return at some point but it's not high on the priority list right now.
+
+#### Originally from Smarter CSV - Why?
 
 Ruby's CSV library's API is pretty old, and it's processing of CSV-files returning Arrays of Arrays feels 'very close to the metal'. The output is not easy to use - especially not if you want to create database records from it. Another shortcoming is that Ruby's CSV library does not have good support for huge CSV-files, e.g. there is no support for 'chunking' and/or parallel processing of the CSV-content (e.g. with Resque or Sidekiq),
 
@@ -30,14 +44,13 @@ As the existing CSV libraries didn't fit my needs, I was writing my own CSV proc
 
 ### Examples
 
-The two main choices you have in terms of how to call `SmarterCSV.process` are:
+The two main choices you have in terms of how to call `LazyCSV.process` are:
  * calling `process` with or without a block
- * passing a `:chunk_size` to the `process` method, and processing the CSV-file in chunks, rather than in one piece.
 
-Tip: If you are uncertain about what line endings a CSV-file uses, try specifying `:row_sep => :auto` as part of the options.
+Tip: If you are uncertain about what line endings a CSV-file uses, try specifying `row_sep: :auto` as part of the options.
 But this could be slow, because it will try to analyze each CSV file first. If you want to speed things up, set the `:row_sep` manually! Checkout Example 5 for unusual `:row_sep` and `:col_sep`.
 
-#### Example 1a: How SmarterCSV processes CSV-files as array of hashes:
+#### Example 1a: How LazyCSV processes CSV-files as array of hashes:
 Please note how each hash contains only the keys for columns with non-null values.
 
      $ cat pets.csv
@@ -47,9 +60,9 @@ Please note how each hash contains only the keys for columns with non-null value
      Miles,O'Brian,,,,21
      Nancy,Homes,2,,1,
      $ irb
-     > require 'smarter_csv'
+     > require 'lazy_csv'
       => true
-     > pets_by_owner = SmarterCSV.process('/tmp/pets.csv')
+     > pets_by_owner = LazyCSV.process('/tmp/pets.csv').to_a
       => [ {:first_name=>"Dan", :last_name=>"McAllister", :dogs=>"2"},
            {:first_name=>"Lucy", :last_name=>"Laweless", :cats=>"5"},
            {:first_name=>"Miles", :last_name=>"O'Brian", :fish=>"21"},
@@ -57,76 +70,34 @@ Please note how each hash contains only the keys for columns with non-null value
          ]
 
 
-#### Example 1b: How SmarterCSV processes CSV-files as chunks, returning arrays of hashes:
+#### Example 1b: How LazyCSV processes CSV-files as chunks, returning arrays of hashes:
 Please note how the returned array contains two sub-arrays containing the chunks which were read, each chunk containing 2 hashes.
 In case the number of rows is not cleanly divisible by `:chunk_size`, the last chunk contains fewer hashes.
 
-     > pets_by_owner = SmarterCSV.process('/tmp/pets.csv', {:chunk_size => 2, :key_mapping => {:first_name => :first, :last_name => :last}})
+     > pets_by_owner = LazyCSV.process('/tmp/pets.csv', {:chunk_size => 2, :key_mapping => {:first_name => :first, :last_name => :last}}).to_a
        => [ [ {:first=>"Dan", :last=>"McAllister", :dogs=>"2"}, {:first=>"Lucy", :last=>"Laweless", :cats=>"5"} ],
             [ {:first=>"Miles", :last=>"O'Brian", :fish=>"21"}, {:first=>"Nancy", :last=>"Homes", :dogs=>"2", :birds=>"1"} ]
           ]
 
-#### Example 1c: How SmarterCSV processes CSV-files as chunks, and passes arrays of hashes to a given block:
-Please note how the given block is passed the data for each chunk as the parameter (array of hashes),
-and how the `process` method returns the number of chunks when called with a block
-
-     > total_chunks = SmarterCSV.process('/tmp/pets.csv', {:chunk_size => 2, :key_mapping => {:first_name => :first, :last_name => :last}}) do |chunk|
-         chunk.each do |h|   # you can post-process the data from each row to your heart's content, and also create virtual attributes:
-           h[:full_name] = [h[:first],h[:last]].join(' ')  # create a virtual attribute
-           h.delete(:first) ; h.delete(:last)              # remove two keys
-         end
-         puts chunk.inspect   # we could at this point pass the chunk to a Resque worker..
-       end
-
-       [{:dogs=>"2", :full_name=>"Dan McAllister"}, {:cats=>"5", :full_name=>"Lucy Laweless"}]
-       [{:fish=>"21", :full_name=>"Miles O'Brian"}, {:dogs=>"2", :birds=>"1", :full_name=>"Nancy Homes"}]
-        => 2
-
 #### Example 2: Reading a CSV-File in one Chunk, returning one Array of Hashes:
 
     filename = '/tmp/input_file.txt' # TAB delimited file, each row ending with Control-M
-    recordsA = SmarterCSV.process(filename, {:col_sep => "\t", :row_sep => "\cM"})  # no block given
+    recordsA = LazyCSV.process(filename, {:col_sep => "\t", :row_sep => "\cM"}).to_a  # no block given
 
     => returns an array of hashes
 
-#### Example 3: Populate a MySQL or MongoDB Database with SmarterCSV:
+#### Example 3: Populate a MySQL or MongoDB Database with LazyCSV:
 
     # without using chunks:
     filename = '/tmp/some.csv'
     options = {:key_mapping => {:unwanted_row => nil, :old_row_name => :new_name}}
-    n = SmarterCSV.process(filename, options) do |array|
+    n = LazyCSV.process(filename, options) do |array|
           # we're passing a block in, to process each resulting hash / =row (the block takes array of hashes)
           # when chunking is not enabled, there is only one hash in each array
           MyModel.create( array.first )
     end
 
      => returns number of chunks / rows we processed
-
-#### Example 4: Populate a MongoDB Database in Chunks of 100 records with SmarterCSV:
-
-    # using chunks:
-    filename = '/tmp/some.csv'
-    options = {:chunk_size => 100, :key_mapping => {:unwanted_row => nil, :old_row_name => :new_name}}
-    n = SmarterCSV.process(filename, options) do |chunk|
-          # we're passing a block in, to process each resulting hash / row (block takes array of hashes)
-          # when chunking is enabled, there are up to :chunk_size hashes in each chunk
-          MyModel.collection.insert( chunk )   # insert up to 100 records at a time
-    end
-
-     => returns number of chunks we processed
-
-
-#### Example 5: Reading a CSV-like File, and Processing it with Resque:
-
-    filename = '/tmp/strange_db_dump'   # a file with CRTL-A as col_separator, and with CTRL-B\n as record_separator (hello iTunes!)
-    options = {
-      :col_sep => "\cA", :row_sep => "\cB\n", :comment_regexp => /^#/,
-      :chunk_size => 100 , :key_mapping => {:export_date => nil, :name => :genre}
-    }
-    n = SmarterCSV.process(filename, options) do |chunk|
-        Resque.enque( ResqueWorkerClass, chunk ) # pass chunks of CSV-data to Resque workers for parallel processing
-    end
-    => returns number of chunks
 
 #### Example 6: Using Value Converters
 
@@ -138,7 +109,7 @@ NOTE: If you use `key_mappings` and `value_converters`, make sure that the value
     Tom,Turner,2/1/2011,$15.99
     Ken,Smith,01/09/2013,$199.99
     $ irb
-    > require 'smarter_csv'
+    > require 'lazy_csv'
     > require 'date'
 
     # define a custom converter class, which implements self.convert(value)
@@ -155,7 +126,7 @@ NOTE: If you use `key_mappings` and `value_converters`, make sure that the value
     end
 
     options = {:value_converters => {:date => DateConverter, :price => DollarConverter}}
-    data = SmarterCSV.process("spec/fixtures/with_dates.csv", options)
+    data = LazyCSV.process("spec/fixtures/with_dates.csv", options)
     data[0][:date]
       => #<Date: 1998-10-30 ((2451117j,0s,0n),+0s,2299161j)>
     data[0][:date].class
@@ -170,14 +141,14 @@ NOTE: If you use `key_mappings` and `value_converters`, make sure that the value
 
 ## Documentation
 
-The `process` method reads and processes a "generalized" CSV file and returns the contents either as an Array of Hashes,
-or an Array of Arrays, which contain Hashes, or processes Chunks of Hashes via a given block.
+The `process` method reads and processes a "generalized" CSV file and returns an `Enumerator::Lazy`.
+This can either be iterated over (via `each`) or converted into a record set by calling `to_a`.
 
-    SmarterCSV.process(filename, options={}, &block)
+    LazyCSV.process(filename_or_io, options={}, &block)
 
 The options and the block are optional.
 
-`SmarterCSV.process` supports the following options:
+`LazyCSV.process` supports the following options:
 
      | Option                      | Default  |  Explanation                                                                         |
      ---------------------------------------------------------------------------------------------------------------------------------
@@ -186,7 +157,7 @@ The options and the block are optional.
      |                             |          | This can also be set to :auto, but will process the whole cvs file first  (slow!)    |
      | :quote_char                 |   '"'    | quotation character                                                                  |
      | :comment_regexp             |   /^#/   | regular expression which matches comment lines (see NOTE about the CSV header)       |
-     | :chunk_size                 |   nil    | if set, determines the desired chunk-size (defaults to nil, no chunk processing)     |
+     | :parse_to_arrays            |   false  | if set, returns a zero-indexed array as opposed to a hash keyed by headers           |
      ---------------------------------------------------------------------------------------------------------------------------------
      | :key_mapping                |   nil    | a hash which maps headers from the CSV file to keys in the result hash               |
      | :remove_unmapped_keys       |   false  | when using :key_mapping option, should non-mapped keys / columns be removed?         |
@@ -226,7 +197,7 @@ The options and the block are optional.
 
 
        File.open(filename, "r:bom|utf-8") do |f|
-         data = SmarterCSV.process(f);
+         data = LazyCSV.process(f);
        end
 
 * if the CSV file with unicode characters is in a remote location, similarly you need to give the encoding as an option to the `open` call:
@@ -234,7 +205,7 @@ The options and the block are optional.
        require 'open-uri'
        file_location = 'http://your.remote.org/sample.csv'
        open(file_location, 'r:utf-8') do |f|   # don't forget to specify the UTF-8 encoding!!
-         data = SmarterCSV.process(f)
+         data = LazyCSV.process(f)
        end
 
 #### NOTES about CSV Headers:
@@ -243,19 +214,12 @@ The options and the block are optional.
  * any occurences of :comment_regexp or :row_sep will be stripped from the first line with the CSV header
  * any of the keys in the header line will be downcased, spaces replaced by underscore, and converted to Ruby symbols before being used as keys in the returned Hashes
  * you can not combine the :user_provided_headers and :key_mapping options
- * if the incorrect number of headers are provided via :user_provided_headers, exception SmarterCSV::HeaderSizeMismatch is raised
+ * if the incorrect number of headers are provided via :user_provided_headers, exception LazyCSV::HeaderSizeMismatch is raised
 
 #### NOTES on Key Mapping:
  * keys in the header line of the file can be re-mapped to a chosen set of symbols, so the resulting Hashes can be better used internally in your application (e.g. when directly creating MongoDB entries with them)
  * if you want to completely delete a key, then map it to nil or to '', they will be automatically deleted from any result Hash
  * if you have input files with a large number of columns, and you want to ignore all columns which are not specifically mapped with :key_mapping, then use option :remove_unmapped_keys => true
-
-#### NOTES on the use of Chunking and Blocks:
- * chunking can be VERY USEFUL if used in combination with passing a block to File.read_csv FOR LARGE FILES
- * if you pass a block to File.read_csv, that block will be executed and given an Array of Hashes as the parameter.
- * if the chunk_size is not set, then the array will only contain one Hash.
- * if the chunk_size is > 0 , then the array may contain up to chunk_size Hashes.
- * this can be very useful when passing chunked data to a post-processing step, e.g. through Resque
 
 #### NOTES on improper quotation and unwanted characters in headers:
  * some CSV files use un-escaped quotation characters inside fields. This can cause the import to break. To get around this, use the `:force_simple_split => true` option in combination with `:strip_chars_from_headers => /[\-"]/` . This will also significantly speed up the import.
@@ -271,7 +235,7 @@ The options and the block are optional.
 
 Add this line to your application's Gemfile:
 
-    gem 'smarter_csv'
+    gem 'lazy_csv'
 
 And then execute:
 
@@ -279,15 +243,19 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install smarter_csv
+    $ gem install lazy_csv
 
 ## Upcoming
 
 Planned in the next releases:
  * programmatic header transformations
- * CSV command line
 
 ## Changes
+
+#### 0.5.0 (2017-08-26)
+ * Forked to lazy_csv and versioning reset as it's not ready for primetime yet :)
+
+## SmarterCSV Changes
 
 #### 1.1.4 (2017-01-16)
  * fixing UTF-8 related bug which was introduced in 1.1.2 (thank to Tirdad C.)
@@ -402,14 +370,14 @@ Planned in the next releases:
 
 #### 1.0.0 (2012-07-29)
 
- * renamed `SmarterCSV.process_csv` to `SmarterCSV.process`.
+ * renamed `LazyCSV.process_csv` to `LazyCSV.process`.
 
 #### 1.0.0.pre1 (2012-07-29)
 
 
 ## Reporting Bugs / Feature Requests
 
-Please [open an Issue on GitHub](https://github.com/tilo/smarter_csv/issues) if you have feedback, new feature requests, or want to report a bug. Thank you!
+Please [open an Issue on GitHub](https://github.com/tilo/lazy_csv/issues) if you have feedback, new feature requests, or want to report a bug. Thank you!
 
 
 ## Special Thanks
@@ -417,6 +385,7 @@ Please [open an Issue on GitHub](https://github.com/tilo/smarter_csv/issues) if 
 Many thanks to people who have filed issues and sent comments.
 And a special thanks to those who contributed pull requests:
 
+ * [Tilo](https://github.com/tilo)
  * [Jack 0](https://github.com/xjlin0)
  * [Alejandro](https://github.com/agaviria)
  * [Lucas Camargo de Almeida](https://github.com/lcalmeida)
@@ -454,4 +423,3 @@ And a special thanks to those who contributed pull requests:
 3. Commit your changes (`git commit -am 'Added some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
-
