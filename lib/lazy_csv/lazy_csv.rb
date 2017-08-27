@@ -313,7 +313,8 @@ class LazyCSV
 
     else
       # TODO: This is used once, remove the core extension?
-      hash = Hash.zip(@headers, dataA) # from Facets of Ruby library
+
+      hash = @headers.zip(dataA).to_h # from Facets of Ruby library
       # make sure we delete any key/value pairs from the hash, which the user wanted to delete:
       # Note: Ruby < 1.9 doesn't allow empty symbol literals!
       hash.delete(nil); hash.delete('')
