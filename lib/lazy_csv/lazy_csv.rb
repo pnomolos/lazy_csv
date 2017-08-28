@@ -105,6 +105,51 @@ class LazyCSV
     new(input, options).read
   end
 
+  class LazyReader
+    extend Forwardable
+
+    def_delegators :@enumerator, *(
+      Enumerator::Lazy.instance_methods(false) +
+      Enumerator.instance_methods(false) +
+      Enumerable.instance_methods(false)
+    )
+
+    def initialize(lazy_csv)
+      @io = lazy_csv.instance_variable_get(:@io)
+      @seek_pos = @io.pos
+      @lazy_csv = lazy_csv
+      options = lazy_csv.instance_variable_get(:@options)
+      csv_options = lazy_csv.instance_variable_get(:@csv_options)
+      @enumerator = Enumerator::Lazy.new(@io.each_line(options[:row_sep])) do |yielder, line|
+        yielder.yield lazy_csv.send(:read_line, line, options, csv_options)
+      end
+      @enumerator = @enumerator.reject(&:nil?) if options[:remove_empty_hashes]
+    end
+
+    def each(&block)
+      r = @enumerator.each(&block)
+      close_io
+      r
+    end
+
+    def rewind
+      @io.seek(@seek_pos)
+      @enumerator.rewind
+    end
+
+    def to_a
+      r = @enumerator.to_a
+      close_io
+      r
+    end
+
+    def close_io
+      @io.close unless @lazy_csv.instance_variable_get(:@input_is_io)
+    end
+
+    alias force to_a
+  end
+
   def read
     if @options[:chunk_size].to_i > 0
       use_chunks = true
@@ -117,24 +162,24 @@ class LazyCSV
 
     # seek_pos = @io.pos
 
-    enumerator = Enumerator::Lazy.new(@io.each_line(@options[:row_sep])) do |yielder, line|
-      yielder.yield read_line(line, @options, @csv_options)
-    end
+    # enumerator = Enumerator::Lazy.new(@io.each_line(@options[:row_sep])) do |yielder, line|
+    #   yielder.yield read_line(line, @options, @csv_options)
+    # end
+    #
+    # enumerator = enumerator.reject(&:nil?) if @options[:remove_empty_hashes]
+    #
+    # enumerator.instance_variable_set(:@io, @io)
+    # enumerator.instance_variable_set(:@close_io, !@input_is_io)
+    # enumerator.instance_variable_set(:@seek_pos, @io.pos)
+    #
+    # class << enumerator
+    #   def rewind
+    #     @io.seek(@seek_pos)
+    #     super
+    #   end
+    # end
 
-    enumerator = enumerator.reject(&:nil?) if @options[:remove_empty_hashes]
-
-    enumerator.instance_variable_set(:@io, @io)
-    enumerator.instance_variable_set(:@close_io, !@input_is_io)
-    enumerator.instance_variable_set(:@seek_pos, @io.pos)
-
-    class << enumerator
-      def rewind
-        @io.seek(@seek_pos)
-        super
-      end
-    end
-
-    return enumerator
+    return LazyReader.new(self)
     #
     #   next unless hash
     #
