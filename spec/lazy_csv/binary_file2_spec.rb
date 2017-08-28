@@ -11,8 +11,8 @@ fixture_path = 'spec/fixtures'
 describe 'be_able_to' do
   it 'loads_binary_file_with_strings_as_keys' do
     options = {:col_sep => "\cA", :row_sep => "\cB", :comment_regexp => /^#/, :strings_as_keys => true}
-    data = LazyCSV.process("#{fixture_path}/binary.csv", options)
-    data.to_a.flatten.size.should == 8
+    data = LazyCSV.process("#{fixture_path}/binary.csv", options).to_a
+    data.flatten.size.should == 8
     data.each do |item|
       # all keys should be strings
       item.keys.each{|x| x.class.should be == String}

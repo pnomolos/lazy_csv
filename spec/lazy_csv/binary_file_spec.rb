@@ -9,8 +9,8 @@ fixture_path = 'spec/fixtures'
 describe 'be_able_to' do
   it 'loads_binary_file_with_comments' do
     options = {:col_sep => "\cA", :row_sep => "\cB", :comment_regexp => /^#/}
-    data = LazyCSV.process("#{fixture_path}/binary.csv", options)
-    data.to_a.flatten.size.should == 8
+    data = LazyCSV.process("#{fixture_path}/binary.csv", options).to_a
+    data.flatten.size.should == 8
     data.each do |item|
       # all keys should be symbols
       item.keys.each{|x| x.class.should be == Symbol}
