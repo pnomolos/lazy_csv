@@ -30,6 +30,7 @@ class LazyCSV
     keep_original_headers: false,
     value_converters: nil,
     skip_lines: nil,
+    skip_until: nil,
     force_utf8: false,
     invalid_byte_sequence: '',
     parse_to_arrays: false
@@ -80,7 +81,7 @@ class LazyCSV
     if @options[:skip_until]
       current_pos = @io.pos
       until @io.readline(@options[:row_sep]) =~ @options[:skip_until]
-        current_pos += @io.pos
+        current_pos = @io.pos
         @file_line_count += 1
       end
 
