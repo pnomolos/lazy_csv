@@ -59,6 +59,10 @@ class LazyCSV
       raise LazyCSV::IncorrectOption, 'ERROR [lazy_csv]: :row_sep must be a string or :auto'
     end
 
+    if @options[:skip_until] && !@options[:skip_until].is_a?(Regexp)
+      raise LazyCSV::IncorrectOption, 'ERROR [lazy_csv]: :skip_until must be a Regexp'
+    end
+
     if (@options[:force_utf8] || @options[:file_encoding] =~ /utf-8/i) && (@io.respond_to?(:external_encoding) && @io.external_encoding != Encoding.find('UTF-8') || @io.respond_to?(:encoding) && f.encoding != Encoding.find('UTF-8'))
       puts 'WARNING: you are trying to process UTF-8 input, but did not open the input with "b:utf-8" option. See README file "NOTES about File Encodings".'
     end
@@ -68,7 +72,20 @@ class LazyCSV
       @io.rewind
     end
 
-    [0, @options[:skip_lines].to_i].max.times { @io.readline(@options[:row_sep]) }
+    [0, @options[:skip_lines].to_i].max.times do
+      @io.readline(@options[:row_sep])
+      @file_line_count += 1
+    end
+
+    if @options[:skip_until]
+      current_pos = @io.pos
+      until @io.readline(@options[:row_sep]) =~ @options[:skip_until]
+        current_pos += @io.pos
+        @file_line_count += 1
+      end
+
+      @io.seek(current_pos)
+    end
 
     if @options[:headers_in_file] # extract the header line
       file_headerA = read_header
