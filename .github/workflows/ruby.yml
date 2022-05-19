@@ -45,7 +45,7 @@ jobs:
         env:
           JAVA_OPTS: -Djdk.io.File.enableADS=true
       - name: Run tests
-        run: bundle exec rake test
+        run: bundle exec rake spec
         env:
           JAVA_OPTS: -Djdk.io.File.enableADS=true
 
