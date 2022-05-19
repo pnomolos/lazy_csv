@@ -13,7 +13,7 @@ describe 'be_able_to' do
     data[2][:model].should eq 'Venture "Extended Edition, Very Large"'
     data[2][:description].should be_nil
     data.each do |h|
-      h[:year].class.should eq Fixnum
+      h[:year].class.should eq Integer
       h[:make].should_not be_nil
       h[:model].should_not be_nil
       h[:price].class.should eq Float

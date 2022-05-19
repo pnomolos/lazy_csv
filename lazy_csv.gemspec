@@ -16,6 +16,9 @@ Gem::Specification.new do |gem|
   gem.requirements  = ['csv'] # for CSV.parse() only needed in case we have quoted fields
   gem.version       = LazyCSV::VERSION
   gem.licenses      = ['MIT', 'GPL-2']
+
+  gem.required_ruby_version = '>= 2.5.0'
+
   gem.add_development_dependency "rspec"
   # gem.add_development_dependency "guard-rspec"
 end

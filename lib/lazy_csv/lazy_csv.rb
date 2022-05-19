@@ -251,7 +251,7 @@ class LazyCSV
 
     if (header =~ /#{@options[:quote_char]}/) && (!@options[:force_simple_split])
       file_headerA = begin
-        CSV.parse(header, @csv_options).flatten.collect! { |x| x.nil? ? '' : x } # to deal with nil values from CSV.parse
+        CSV.parse(header, **@csv_options).flatten.collect! { |x| x.nil? ? '' : x } # to deal with nil values from CSV.parse
       rescue CSV::MalformedCSVError
         raise $ERROR_INFO, "#{$ERROR_INFO} [LazyCSV: csv line #{@csv_line_count}]", $ERROR_INFO.backtrace
       end
@@ -332,7 +332,7 @@ class LazyCSV
 
     if (line =~ /#{@options[:quote_char]}/) && (!@options[:force_simple_split])
       dataA = begin
-        CSV.parse(line, @csv_options).flatten.collect! { |x| x.nil? ? '' : x } # to deal with nil values from CSV.parse
+        CSV.parse(line, **@csv_options).flatten.collect! { |x| x.nil? ? '' : x } # to deal with nil values from CSV.parse
       rescue CSV::MalformedCSVError
         raise $ERROR_INFO, "#{$ERROR_INFO} [LazyCSV: csv line #{@csv_line_count}]", $ERROR_INFO.backtrace
       end

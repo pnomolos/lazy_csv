@@ -17,7 +17,7 @@ describe 'be_able_to' do
       # all keys should be strings
       item.keys.each{|x| x.class.should be == String}
       item['timestamp'].should == 1381388409
-      item['item_id'].class.should be == Fixnum
+      item['item_id'].class.should be == Integer
       item['name'].size.should be > 0
     end
   end
